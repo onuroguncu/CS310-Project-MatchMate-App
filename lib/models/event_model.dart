@@ -11,3 +11,4 @@ class EventModel {
     required this.daysLeft,
   });
 }
+
