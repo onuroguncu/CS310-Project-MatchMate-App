@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../utils/app_colors.dart';
 import '../utils/app_text_styles.dart';
 import '../widgets/main_bottom_nav.dart';
+import '../providers/auth_provider.dart';
+import '../routes/app_routes.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -18,7 +21,7 @@ class SettingsScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // bar chart
+            // Bar Chart Container
             Container(
               width: double.infinity,
               height: 180,
@@ -48,6 +51,7 @@ class SettingsScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
+            // Charts Row/Column
             Flex(
               direction: isWide ? Axis.horizontal : Axis.vertical,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -58,6 +62,7 @@ class SettingsScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 24),
+            // Settings Options
             SwitchListTile(
               title: const Text('Notifications'),
               value: true,
@@ -68,6 +73,31 @@ class SettingsScreen extends StatelessWidget {
               value: true,
               onChanged: (_) {},
             ),
+            const SizedBox(height: 32),
+            // LOGOUT BUTTON 
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red.shade700,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () async {
+                  await Provider.of<AuthProvider>(context, listen: false).signOut();
+                  if (context.mounted) {
+                    Navigator.pushNamedAndRemoveUntil(
+                      context, 
+                      AppRoutes.login, 
+                      (route) => false,
+                    );
+                  }
+                },
+                child: const Text('LOGOUT', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ),
+            ),
+            const SizedBox(height: 20),
           ],
         ),
       ),
