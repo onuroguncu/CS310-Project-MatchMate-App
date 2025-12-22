@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../routes/app_routes.dart';
 import '../utils/app_colors.dart';
 import '../utils/app_text_styles.dart';
+import '../providers/auth_provider.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,26 +16,37 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   String _email = '';
   String _password = '';
+  bool _isLoading = false;
 
-  void _submit() {
+  void _submit() async {
     if (!_formKey.currentState!.validate()) {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Invalid Input'),
-          content: const Text('Please fix the errors in the form.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
       return;
     }
+    
     _formKey.currentState!.save();
-    Navigator.pushReplacementNamed(context, AppRoutes.profileStep1);
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await Provider.of<AuthProvider>(context, listen: false).signIn(_email, _password);
+      // Not: Giriş başarılı olduğunda main.dart'taki yönlendirme sayesinde 
+      // otomatik olarak ana sayfaya geçeceksiniz.
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString()),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -50,7 +63,6 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Asset image (logo)
               Container(
                 padding: const EdgeInsets.only(bottom: 16),
                 child: Image.asset(
@@ -82,8 +94,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       keyboardType: TextInputType.emailAddress,
                       validator: (value) =>
                           value == null || !value.contains('@')
-                          ? 'Enter a valid email'
-                          : null,
+                              ? 'Enter a valid email'
+                              : null,
                       onSaved: (value) => _email = value ?? '',
                     ),
                     const SizedBox(height: 16),
@@ -106,8 +118,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           backgroundColor: AppColors.primary,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
-                        onPressed: _submit,
-                        child: const Text('Login', style: AppTextStyles.button),
+                        onPressed: _isLoading ? null : _submit,
+                        child: _isLoading 
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : const Text('Login', style: AppTextStyles.button),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -115,6 +129,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       width: double.infinity,
                       child: OutlinedButton(
                         onPressed: () {
+                          // Kayıt ol sayfasına yönlendirme (AppRoutes.register gibi bir rotanız olmalı)
                           Navigator.pushNamed(context, AppRoutes.profileStep1);
                         },
                         child: const Text('Create Account'),
