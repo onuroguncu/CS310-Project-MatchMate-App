@@ -4,10 +4,8 @@ import 'package:provider/provider.dart';
 import 'routes/app_routes.dart';
 import 'utils/app_colors.dart';
 import 'utils/app_text_styles.dart';
-
-// Bu importlar bir sonraki adımlarda eklenecek:
-// import 'providers/auth_provider.dart';
-// import 'providers/match_provider.dart';
+import 'providers/auth_provider.dart';
+import 'providers/match_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
