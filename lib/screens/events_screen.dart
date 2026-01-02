@@ -1,154 +1,200 @@
 import 'package:flutter/material.dart';
-import '../models/event_model.dart';
-import '../widgets/main_bottom_nav.dart';
-import '../utils/app_colors.dart';
-import '../utils/app_text_styles.dart';
-import '../routes/app_routes.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
+import '../services/firestore_service.dart';
 
-class EventsScreen extends StatefulWidget {
-  const EventsScreen({super.key});
+class EventsScreen extends StatelessWidget {
+  final FirestoreService _fs = FirestoreService();
 
-  @override
-  State<EventsScreen> createState() => _EventsScreenState();
-}
-
-class _EventsScreenState extends State<EventsScreen> {
-  late List<EventModel> _events;
-
-  @override
-  void initState() {
-    super.initState();
-    _events = _dummyEvents();
-  }
-
-  List<EventModel> _dummyEvents() {
-    return [
-      EventModel(
-        title: 'Anniversary',
-        subtitle: 'Book a nice restaurant',
-        date: 'November 10, 2025 · 7:00 PM',
-        daysLeft: '5 days left',
-      ),
-      EventModel(
-        title: 'Her Birthday',
-        subtitle: 'Plan surprise party',
-        date: 'December 3, 2025 · 8:30 PM',
-        daysLeft: '28 days left',
-      ),
-      EventModel(
-        title: 'First Match Together',
-        subtitle: 'Buy match tickets',
-        date: 'January 15, 2026 · 9:45 PM',
-        daysLeft: '70 days left',
-      ),
-    ];
-  }
-
-  void _removeEvent(int index) {
-    setState(() {
-      _events.removeAt(index);
-    });
-  }
+  EventsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    // Tema Renkleri
+    const Color primaryOrange = Color(0xFFFB923C);
+    const Color cardBackground = Color(0xFF1E293B);
+
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: AppColors.surface,
-        title: const Text('Upcoming Events'),
-        actions: [
-          IconButton(
-            onPressed: () {
-              Navigator.pushNamed(context, AppRoutes.createEvent);
-            },
-            icon: const Icon(Icons.add),
-          ),
-        ],
+        title: const Text("Events", style: TextStyle(fontWeight: FontWeight.bold)),
+        automaticallyImplyLeading: false, // BottomNav olduğu için geri butonunu kaldırır
       ),
-      bottomNavigationBar: const MainBottomNav(currentIndex: 1),
-      body: _events.isEmpty
-          ? const Center(
-              child: Text(
-                'No events yet.\nTap + to create one!',
-                textAlign: TextAlign.center,
-              ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _events.length,
-              itemBuilder: (context, index) {
-                final e = _events[index];
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: primaryOrange,
+        child: const Icon(Icons.add, color: Colors.white),
+        onPressed: () => _showAddEventDialog(context),
+      ),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: _fs.getEvents(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator(color: primaryOrange));
+          }
 
-                return Dismissible(
-                  key: ValueKey('${e.title}-${e.date}'),
-                  direction: DismissDirection.endToStart,
-                  onDismissed: (_) => _removeEvent(index),
-                  background: Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.redAccent,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    alignment: Alignment.centerRight,
-                    padding: const EdgeInsets.only(right: 24),
-                    child: const Icon(Icons.delete, color: Colors.white),
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.event_busy_rounded, size: 60, color: Colors.white.withOpacity(0.2)),
+                  const SizedBox(height: 10),
+                  const Text("No events planned yet", style: TextStyle(color: Colors.grey)),
+                ],
+              ),
+            );
+          }
+
+          final events = snapshot.data!.docs;
+
+          return ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            itemCount: events.length,
+            itemBuilder: (context, index) {
+              var doc = events[index];
+              var event = doc.data() as Map<String, dynamic>;
+              DateTime date = (event['date'] as Timestamp).toDate();
+
+              // Kalan gün hesabı
+              final now = DateTime.now();
+              final today = DateTime(now.year, now.month, now.day);
+              final eventDay = DateTime(date.year, date.month, date.day);
+              int daysLeft = eventDay.difference(today).inDays;
+
+              // Görseldeki gibi kartlara sırayla farklı renkler atar
+              List<Color> accentColors = [
+                const Color(0xFFFB923C), // Turuncu
+                const Color(0xFF818CF8), // Mor/Mavi
+                const Color(0xFF34D399), // Yeşil
+                const Color(0xFFF472B6), // Pembe
+              ];
+              Color accentColor = accentColors[index % accentColors.length];
+
+              return Dismissible(
+                key: Key(doc.id),
+                direction: DismissDirection.endToStart,
+                background: Container(
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.only(right: 20),
+                  decoration: BoxDecoration(color: Colors.redAccent, borderRadius: BorderRadius.circular(20)),
+                  child: const Icon(Icons.delete, color: Colors.white),
+                ),
+                onDismissed: (direction) => _fs.deleteEvent(doc.id),
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 15),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: cardBackground,
+                    borderRadius: BorderRadius.circular(20),
+                    // Görseldeki sol renkli şerit
+                    border: Border(left: BorderSide(color: accentColor, width: 6)),
                   ),
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    child: Card(
-                      color: AppColors.surface,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.all(16),
-                        leading: ClipRRect(
+                  child: Row(
+                    children: [
+                      // Sol İkon Kutusu
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: accentColor.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(12),
-                          child: Image.network(
-                            // NETWORK IMAGE ✅
-                            'https://picsum.photos/seed/${index + 1}/80/80',
-                            width: 56,
-                            height: 56,
-                            fit: BoxFit.cover,
-                          ),
                         ),
-                        title: Text(
-                          e.title,
-                          style: AppTextStyles.heading2,
-                        ),
-                        subtitle: Padding(
-                          padding: const EdgeInsets.only(top: 4.0),
-                          child: Text(
-                            e.subtitle,
-                            style: AppTextStyles.body,
-                          ),
-                        ),
-                        trailing: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.end,
+                        child: Icon(Icons.celebration_rounded, color: accentColor, size: 28),
+                      ),
+                      const SizedBox(width: 15),
+                      // Orta Bilgiler
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              e.date,
-                              style: AppTextStyles.body.copyWith(
-                                fontSize: 12,
-                              ),
+                              event['title'],
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              e.daysLeft,
-                              style: const TextStyle(
-                                color: AppColors.accentYellow,
-                                fontWeight: FontWeight.bold,
-                              ),
+                            const SizedBox(height: 5),
+                            Row(
+                              children: [
+                                const Icon(Icons.access_time, size: 14, color: Colors.grey),
+                                const SizedBox(width: 5),
+                                Text(
+                                  DateFormat('MMMM dd, yyyy').format(date),
+                                  style: const TextStyle(color: Colors.grey, fontSize: 13),
+                                ),
+                              ],
                             ),
                           ],
                         ),
                       ),
-                    ),
+                      // Sağdaki Kırmızı Gün Rozeti (Badge)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.redAccent.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          daysLeft == 0 ? "Today" : "$daysLeft days",
+                          style: const TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
                   ),
-                );
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  // Yeni Etkinlik Ekleme Diyaloğu
+  void _showAddEventDialog(BuildContext context) {
+    final titleController = TextEditingController();
+    DateTime selectedDate = DateTime.now();
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: const Color(0xFF1E293B),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text("New Special Day"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: titleController,
+                decoration: const InputDecoration(labelText: "Event Title (e.g. Birthday)"),
+              ),
+              const SizedBox(height: 20),
+              ListTile(
+                title: Text(DateFormat('yyyy-MM-dd').format(selectedDate)),
+                trailing: const Icon(Icons.calendar_month, color: Color(0xFFFB923C)),
+                onTap: () async {
+                  DateTime? picked = await showDatePicker(
+                    context: context,
+                    initialDate: selectedDate,
+                    firstDate: DateTime.now(),
+                    lastDate: DateTime(2035),
+                  );
+                  if (picked != null) setDialogState(() => selectedDate = picked);
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+            ElevatedButton(
+              onPressed: () async {
+                if (titleController.text.isNotEmpty) {
+                  await _fs.addEvent(titleController.text, selectedDate);
+                  if (context.mounted) Navigator.pop(context);
+                }
               },
+              child: const Text("Add"),
             ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -1,25 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:provider/provider.dart';
 import 'routes/app_routes.dart';
-import 'utils/app_colors.dart';
-import 'utils/app_text_styles.dart';
-import 'providers/auth_provider.dart';
-import 'providers/match_provider.dart';
+import 'screens/main_wrapper.dart';
+
+// Alt menüyü dışarıdan kontrol etmek için global anahtar
+final GlobalKey<MainWrapperState> mainWrapperKey = GlobalKey<MainWrapperState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(); 
-
-  runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider()),
-      ChangeNotifierProvider(create: (_) => MatchProvider()),
-      ],
-      child: const MatchMateApp(),
-    ),
-  );
+  await Firebase.initializeApp();
+  runApp(const MatchMateApp());
 }
 
 class MatchMateApp extends StatelessWidget {
@@ -28,15 +18,19 @@ class MatchMateApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'MatchMate',
       debugShowCheckedModeBanner: false,
+      title: 'MatchMate',
       theme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: AppColors.background,
-        primaryColor: AppColors.primary,
-        textTheme: TextTheme(bodyMedium: AppTextStyles.body),
+        scaffoldBackgroundColor: const Color(0xFF0F172A),
+        primaryColor: const Color(0xFFFB923C),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF0F172A),
+          elevation: 0,
+          centerTitle: true,
+        ),
       ),
-      initialRoute: AppRoutes.login,
+      initialRoute: AppRoutes.splash,
       routes: AppRoutes.routes,
     );
   }

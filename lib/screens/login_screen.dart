@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../routes/app_routes.dart';
-import '../utils/app_colors.dart';
-import '../utils/app_text_styles.dart';
-import '../providers/auth_provider.dart';
+import '../services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -13,140 +10,135 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _formKey = GlobalKey<FormState>();
-  String _email = '';
-  String _password = '';
+  final AuthService _auth = AuthService();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _isLoading = false;
 
-  void _submit() async {
-    if (!_formKey.currentState!.validate()) {
+  void _handleLogin() async {
+    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter email and password.")),
+      );
       return;
     }
-    
-    _formKey.currentState!.save();
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
-    try {
-      await Provider.of<AuthProvider>(context, listen: false).signIn(_email, _password);
-      // Not: Giriş başarılı olduğunda main.dart'taki yönlendirme sayesinde 
-      // otomatik olarak ana sayfaya geçeceksiniz.
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString()),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
+    var user = await _auth.loginWithEmail(
+      _emailController.text.trim(),
+      _passwordController.text.trim(),
+    );
+
+    if (user != null) {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        Navigator.pushReplacementNamed(context, AppRoutes.home);
+      }
+    } else {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Login failed. Please check your credentials.")),
+        );
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-
     return Scaffold(
-      body: Center(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(
-            horizontal: width > 600 ? width * 0.2 : 24,
-            vertical: 24,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: Image.asset(
-                  'assets/images/logo.png',
-                  width: 120,
-                  height: 120,
-                  fit: BoxFit.contain,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 30),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.redAccent.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.favorite,
+                    size: 80,
+                    color: Colors.redAccent,
+                  ),
                 ),
-              ),
-              Text(
-                'MatchTracker',
-                style: AppTextStyles.heading1.copyWith(fontSize: 30),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Your personal football stats hub',
-                style: AppTextStyles.body,
-              ),
-              const SizedBox(height: 32),
-              Form(
-                key: _formKey,
-                child: Column(
-                  children: [
-                    TextFormField(
-                      decoration: const InputDecoration(
-                        labelText: 'Email',
-                        filled: true,
-                      ),
-                      keyboardType: TextInputType.emailAddress,
-                      validator: (value) =>
-                          value == null || !value.contains('@')
-                              ? 'Enter a valid email'
-                              : null,
-                      onSaved: (value) => _email = value ?? '',
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      decoration: const InputDecoration(
-                        labelText: 'Password',
-                        filled: true,
-                      ),
-                      obscureText: true,
-                      validator: (value) => value == null || value.length < 6
-                          ? 'Minimum 6 characters'
-                          : null,
-                      onSaved: (value) => _password = value ?? '',
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
-                        onPressed: _isLoading ? null : _submit,
-                        child: _isLoading 
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text('Login', style: AppTextStyles.button),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton(
-                        onPressed: () {
-                          // Kayıt ol sayfasına yönlendirme (AppRoutes.register gibi bir rotanız olmalı)
-                          Navigator.pushNamed(context, AppRoutes.profileStep1);
-                        },
-                        child: const Text('Create Account'),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextButton(
-                      onPressed: () {},
-                      child: const Text(
-                        'Forgot Password?',
-                        style: AppTextStyles.body,
-                      ),
-                    ),
-                  ],
+                const SizedBox(height: 20),
+                const Text(
+                  "MatchMate",
+                  style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
                 ),
-              ),
-            ],
+                const SizedBox(height: 10),
+                const Text(
+                  "Strengthen your bond",
+                  style: TextStyle(color: Colors.grey, fontSize: 16),
+                ),
+                const SizedBox(height: 40),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text("Email", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _emailController,
+                  decoration: const InputDecoration(
+                    hintText: "Enter your email",
+                    prefixIcon: Icon(Icons.email_outlined, color: Colors.grey),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text("Password", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _passwordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    hintText: "Enter your password",
+                    prefixIcon: Icon(Icons.lock_outline, color: Colors.grey),
+                  ),
+                ),
+                const SizedBox(height: 30),
+                Container(
+                  width: double.infinity,
+                  height: 55,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFEF4444), Color(0xFFF59E0B)],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _handleLogin,
+                    child: _isLoading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text("Login", style: TextStyle(color: Colors.white)),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 55,
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.grey),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () {
+                      Navigator.pushNamed(context, AppRoutes.register);
+                    },
+                    child: const Text("Create Account", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

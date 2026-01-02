@@ -1,79 +1,92 @@
 import 'package:flutter/material.dart';
-import '../utils/app_colors.dart';
-import '../utils/app_text_styles.dart';
+import 'package:table_calendar/table_calendar.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/firestore_service.dart';
+import '../routes/app_routes.dart';
 
-class CalendarScreen extends StatelessWidget {
+class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final days = List.generate(30, (i) => i + 1);
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('Calendar')),
-      body: Column(
-        children: [
-          const SizedBox(height: 16),
-          Text('November 2025', style: AppTextStyles.heading1),
-          const SizedBox(height: 16),
-          Expanded(
-            child: GridView.count(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              crossAxisCount: 7,
-              children: days
-                  .map(
-                    (d) => Container(
-                      margin: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: d % 7 == 0
-                            ? AppColors.primary
-                            : d % 5 == 0
-                            ? AppColors.secondary
-                            : AppColors.surface,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Center(
-                        child: Text(
-                          d.toString(),
-                          style: const TextStyle(color: Colors.white),
-                        ),
-                      ),
-                    ),
-                  )
-                  .toList(),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: const [
-                _LegendDot(color: AppColors.secondary, label: 'High'),
-                _LegendDot(color: AppColors.accentYellow, label: 'Medium'),
-                _LegendDot(color: AppColors.primary, label: 'Low'),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  State<CalendarScreen> createState() => _CalendarScreenState();
 }
 
-class _LegendDot extends StatelessWidget {
-  final Color color;
-  final String label;
+class _CalendarScreenState extends State<CalendarScreen> {
+  final FirestoreService _fs = FirestoreService();
+  DateTime _focusedDay = DateTime.now();
+  DateTime? _selectedDay;
 
-  const _LegendDot({required this.color, required this.label});
+  @override
+  void initState() {
+    super.initState();
+    _selectedDay = _focusedDay;
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        CircleAvatar(radius: 8, backgroundColor: color),
-        const SizedBox(width: 6),
-        Text(label, style: AppTextStyles.body),
-      ],
+    const Color primaryOrange = Color(0xFFFB923C);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text("Calendar")),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: primaryOrange,
+        onPressed: () => Navigator.pushNamed(context, AppRoutes.events),
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: _fs.getEvents(),
+        builder: (context, snapshot) {
+          Map<DateTime, List> eventDays = {};
+          if (snapshot.hasData) {
+            for (var doc in snapshot.data!.docs) {
+              DateTime date = (doc['date'] as Timestamp).toDate();
+              DateTime dayOnly = DateTime(date.year, date.month, date.day);
+              if (eventDays[dayOnly] == null) eventDays[dayOnly] = [];
+              eventDays[dayOnly]!.add(doc['title']);
+            }
+          }
+
+          return Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.all(15),
+                decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(20)),
+                child: TableCalendar(
+                  firstDay: DateTime.utc(2020, 1, 1),
+                  lastDay: DateTime.utc(2035, 12, 31),
+                  focusedDay: _focusedDay,
+                  selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+                  eventLoader: (day) => eventDays[DateTime(day.year, day.month, day.day)] ?? [],
+                  onDaySelected: (selectedDay, focusedDay) => setState(() { _selectedDay = selectedDay; _focusedDay = focusedDay; }),
+                  calendarStyle: const CalendarStyle(
+                    markerDecoration: BoxDecoration(color: primaryOrange, shape: BoxShape.circle),
+                    selectedDecoration: BoxDecoration(gradient: LinearGradient(colors: [Color(0xFFEA580C), primaryOrange]), shape: BoxShape.circle),
+                    todayDecoration: BoxDecoration(color: Colors.white12, shape: BoxShape.circle),
+                    weekendTextStyle: TextStyle(color: primaryOrange),
+                  ),
+                  headerStyle: const HeaderStyle(formatButtonVisible: false, titleCentered: true, leftChevronIcon: Icon(Icons.chevron_left, color: primaryOrange), rightChevronIcon: Icon(Icons.chevron_right, color: primaryOrange)),
+                ),
+              ),
+              Expanded(child: _buildEventList(snapshot)),
+            ],
+          );
+        },
+      ),
     );
   }
+
+  Widget _buildEventList(AsyncSnapshot<QuerySnapshot> snapshot) {
+    if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+    final dailyEvents = snapshot.data!.docs.where((doc) => isSameDay((doc['date'] as Timestamp).toDate(), _selectedDay)).toList();
+    if (dailyEvents.isEmpty) return const Center(child: Text("No events for this day", style: TextStyle(color: Colors.grey)));
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      itemCount: dailyEvents.length,
+      itemBuilder: (context, index) => Card(
+        color: Colors.white.withOpacity(0.05),
+        child: ListTile(leading: const Icon(Icons.star, color: Color(0xFFFB923C)), title: Text(dailyEvents[index]['title'])),
+      ),
+    );
+  }
+  bool isSameDay(DateTime? a, DateTime? b) => a?.year == b?.year && a?.month == b?.month && a?.day == b?.day;
 }
